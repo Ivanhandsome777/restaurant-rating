@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f3eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="吃得如何">
+  <title>吃得如何 · 餐厅评分</title>
+  <style>
+    :root {
+      --ink: #20201d;
+      --muted: #747268;
+      --paper: #f7f3eb;
+      --card: rgba(255, 255, 255, .78);
+      --line: rgba(32, 32, 29, .11);
+      --tomato: #e95b3f;
+      --tomato-dark: #c63d28;
+      --sage: #677d64;
+      --shadow: 0 18px 50px rgba(62, 49, 30, .09);
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--paper); }
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      min-height: 100dvh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 92% 4%, rgba(233, 91, 63, .12), transparent 27rem),
+        radial-gradient(circle at -10% 40%, rgba(103, 125, 100, .12), transparent 25rem),
+        var(--paper);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input, select { font: inherit; }
+    button, select, input[type="range"] { touch-action: manipulation; }
+    button { -webkit-tap-highlight-color: transparent; }
+
+    .shell {
+      width: min(100%, 720px);
+      margin: 0 auto;
+      padding: max(24px, env(safe-area-inset-top)) 16px max(36px, env(safe-area-inset-bottom));
+    }
+
+    header { padding: 14px 4px 26px; }
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--tomato-dark);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      font-family: "Songti SC", "STSong", Georgia, serif;
+      font-size: clamp(38px, 12vw, 62px);
+      font-weight: 700;
+      letter-spacing: -.055em;
+      line-height: .98;
+    }
+    .intro {
+      max-width: 31rem;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    .card {
+      margin-bottom: 14px;
+      padding: 20px;
+      overflow: hidden;
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,.78);
+      border-radius: 26px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    h2 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+    .section-note { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+
+    .field-grid { display: grid; gap: 14px; }
+    label.field { display: grid; gap: 7px; }
+    .label { color: var(--muted); font-size: 13px; font-weight: 650; }
+    input[type="text"], select {
+      width: 100%;
+      min-height: 50px;
+      padding: 0 14px;
+      color: var(--ink);
+      background: rgba(247, 243, 235, .72);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    select {
+      padding-right: 42px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 20 20'%3E%3Cpath d='m5 7 5 5 5-5' fill='none' stroke='%23747268' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+    input:focus, select:focus { border-color: rgba(233, 91, 63, .65); box-shadow: 0 0 0 4px rgba(233, 91, 63, .1); }
+
+    .ratings { display: grid; gap: 8px; }
+    .rating-row {
+      padding: 15px 14px 13px;
+      background: rgba(247, 243, 235, .62);
+      border: 1px solid var(--line);
+      border-radius: 17px;
+    }
+    .rating-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .rating-label { font-size: 15px; font-weight: 700; }
+    .weight {
+      margin-left: 6px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    output.score-pill {
+      min-width: 42px;
+      padding: 5px 9px;
+      color: white;
+      background: var(--ink);
+      border-radius: 999px;
+      font-size: 14px;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+    }
+    input[type="range"] {
+      width: 100%;
+      height: 32px;
+      margin: 7px 0 0;
+      background: transparent;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 7px;
+      background: linear-gradient(90deg, var(--tomato) var(--fill, 44.44%), rgba(32,32,29,.1) var(--fill, 44.44%));
+      border-radius: 999px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      width: 25px;
+      height: 25px;
+      margin-top: -9px;
+      background: white;
+      border: 2px solid var(--tomato);
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(32,32,29,.2);
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    input[type="range"]::-moz-range-track { height: 7px; background: rgba(32,32,29,.1); border-radius: 999px; }
+    input[type="range"]::-moz-range-progress { height: 7px; background: var(--tomato); border-radius: 999px; }
+    input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; background: white; border: 2px solid var(--tomato); border-radius: 50%; }
+
+    .result-card { padding: 0; background: var(--ink); color: white; }
+    .result-grid { display: grid; grid-template-columns: 42% 58%; min-height: 250px; }
+    .total-wrap { display: flex; flex-direction: column; justify-content: center; padding: 24px 0 24px 24px; }
+    .total-label { color: rgba(255,255,255,.58); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+    .total-score { margin-top: 4px; font-family: Georgia, serif; font-size: clamp(54px, 18vw, 90px); line-height: .95; letter-spacing: -.07em; }
+    .total-outof { margin-top: 5px; color: rgba(255,255,255,.5); font-size: 13px; }
+    .verdict { margin: 15px 0 0; color: #f5b39e; font-size: 13px; font-weight: 700; }
+    .chart-wrap { display: grid; place-items: center; min-width: 0; padding: 10px 8px 10px 0; }
+    #radar { width: 100%; height: auto; max-height: 245px; overflow: visible; }
+    .grid-line { fill: none; stroke: rgba(255,255,255,.16); stroke-width: 1; }
+    .axis-line { stroke: rgba(255,255,255,.12); stroke-width: 1; }
+    .radar-area { fill: rgba(233,91,63,.36); stroke: #ff8a6c; stroke-width: 2; transition: points .2s; }
+    .radar-dot { fill: #ffb09a; }
+    .radar-label { fill: rgba(255,255,255,.7); font-size: 10px; font-weight: 650; text-anchor: middle; dominant-baseline: middle; }
+
+    .primary {
+      width: 100%;
+      min-height: 56px;
+      margin-top: 14px;
+      color: white;
+      background: var(--tomato);
+      border: 0;
+      border-radius: 17px;
+      box-shadow: 0 10px 25px rgba(198, 61, 40, .22);
+      font-size: 16px;
+      font-weight: 750;
+      cursor: pointer;
+    }
+    .primary:active { transform: scale(.985); background: var(--tomato-dark); }
+    .ghost, .icon-button {
+      min-height: 36px;
+      padding: 0 12px;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .history { display: grid; gap: 9px; }
+    .empty { padding: 28px 10px; color: var(--muted); font-size: 14px; text-align: center; }
+    .record {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 15px;
+      color: inherit;
+      background: rgba(247, 243, 235, .62);
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .record:active { background: rgba(233,91,63,.08); }
+    .record-name { overflow: hidden; font-size: 15px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+    .record-meta { margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .record-score { color: var(--tomato-dark); font-family: Georgia, serif; font-size: 28px; font-weight: 700; letter-spacing: -.04em; }
+    .record-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+    .danger { color: #a63d2c; }
+    .storage-note { margin: 14px 4px 0; color: var(--muted); font-size: 11px; line-height: 1.5; text-align: center; }
+    #toast {
+      position: fixed;
+      z-index: 10;
+      left: 50%;
+      bottom: max(24px, calc(env(safe-area-inset-bottom) + 14px));
+      padding: 10px 16px;
+      color: white;
+      background: rgba(32,32,29,.94);
+      border-radius: 999px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.2);
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 12px);
+      transition: opacity .22s, transform .22s;
+    }
+    #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (min-width: 540px) {
+      .shell { padding-left: 24px; padding-right: 24px; }
+      .card { padding: 26px; }
+      .result-card { padding: 0; }
+      .field-grid { grid-template-columns: 1fr 1fr; }
+      .field:first-child { grid-column: 1 / -1; }
+      .total-wrap { padding-left: 32px; }
+    }
+    @media (max-width: 360px) {
+      .shell { padding-left: 11px; padding-right: 11px; }
+      .card { padding: 17px; border-radius: 22px; }
+      .result-card { padding: 0; }
+      .result-grid { grid-template-columns: 41% 59%; }
+      .total-wrap { padding-left: 18px; }
+      .radar-label { font-size: 9px; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <p class="eyebrow">Restaurant notes</p>
+      <h1>吃得如何？</h1>
+      <p class="intro">认真记下每一顿。五个维度，一张图，让喜欢变得有据可查。</p>
+    </header>
+
+    <form id="ratingForm">
+      <section class="card" aria-labelledby="basicTitle">
+        <div class="section-head">
+          <div><h2 id="basicTitle">这次吃了什么</h2><p class="section-note">先记下餐厅与同行评分人</p></div>
+        </div>
+        <div class="field-grid">
+          <label class="field">
+            <span class="label">餐厅名称</span>
+            <input id="restaurant" name="restaurant" type="text" placeholder="例如：福和慧" maxlength="50" autocomplete="organization" required>
+          </label>
+          <label class="field">
+            <span class="label">菜系</span>
+            <input id="cuisine" name="cuisine" type="text" placeholder="例如：创意中餐" maxlength="30" required>
+          </label>
+          <label class="field">
+            <span class="label">评分人</span>
+            <select id="reviewer" name="reviewer" required>
+              <option value="小v">小v</option>
+              <option value="小i">小i</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="ratingTitle">
+        <div class="section-head">
+          <div><h2 id="ratingTitle">五维评分</h2><p class="section-note">滑动选择 1–10 分，可选半分</p></div>
+        </div>
+        <div id="ratings" class="ratings"></div>
+      </section>
+
+      <section class="card result-card" aria-label="评分结果">
+        <div class="result-grid">
+          <div class="total-wrap">
+            <span class="total-label">加权总分</span>
+            <strong id="totalScore" class="total-score">5.0</strong>
+            <span class="total-outof">满分 10 分</span>
+            <p id="verdict" class="verdict">值得再探索</p>
+          </div>
+          <div class="chart-wrap">
+            <svg id="radar" viewBox="0 0 250 250" role="img" aria-label="五维评分雷达图"></svg>
+          </div>
+        </div>
+      </section>
+
+      <button class="primary" type="submit">保存这次评分</button>
+    </form>
+
+    <section class="card" style="margin-top: 28px" aria-labelledby="historyTitle">
+      <div class="section-head">
+        <div><h2 id="historyTitle">吃过的地方</h2><p id="historyCount" class="section-note">0 条记录</p></div>
+        <button id="exportButton" class="ghost" type="button">导出备份</button>
+      </div>
+      <div id="history" class="history"></div>
+      <div id="recordActions" class="record-actions" hidden>
+        <button id="deleteButton" class="icon-button danger" type="button">删除当前记录</button>
+      </div>
+      <p class="storage-note">记录保存在当前浏览器中。清除 Safari 网站数据会删除记录，建议偶尔导出备份。</p>
+    </section>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const STORAGE_KEY = 'restaurant-ratings-v1';
+      const dimensions = [
+        { key: 'environment', label: '环境', weight: 0.20 },
+        { key: 'taste', label: '口味', weight: 0.40 },
+        { key: 'value', label: '性价比', weight: 0.10 },
+        { key: 'satisfaction', label: '满足感', weight: 0.20 },
+        { key: 'service', label: '服务', weight: 0.10 }
+      ];
+      const defaultScores = Object.fromEntries(dimensions.map(d => [d.key, 5]));
+      const $ = selector => document.querySelector(selector);
+      const form = $('#ratingForm');
+      const ratingsEl = $('#ratings');
+      let records = readRecords();
+      let selectedId = null;
+      let toastTimer;
+
+      function readRecords() {
+        try {
+          const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+          return Array.isArray(value) ? value : [];
+        } catch (_) { return []; }
+      }
+
+      function writeRecords() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      }
+
+      function escapeHTML(value) {
+        return String(value).replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
+      }
+
+      function buildRatingRows() {
+        ratingsEl.innerHTML = dimensions.map(d => `
+          <div class="rating-row">
+            <div class="rating-meta">
+              <span class="rating-label">${d.label}<span class="weight">权重 ${Math.round(d.weight * 100)}%</span></span>
+              <output class="score-pill" for="${d.key}" id="${d.key}Output">5.0</output>
+            </div>
+            <input type="range" id="${d.key}" name="${d.key}" min="1" max="10" step="0.5" value="5" aria-label="${d.label}评分">
+          </div>`).join('');
+
+        dimensions.forEach(d => {
+          const input = $('#' + d.key);
+          input.addEventListener('input', updateResult);
+        });
+      }
+
+      function currentScores() {
+        return Object.fromEntries(dimensions.map(d => [d.key, Number($('#' + d.key).value)]));
+      }
+
+      function weightedTotal(scores) {
+        return dimensions.reduce((sum, d) => sum + scores[d.key] * d.weight, 0);
+      }
+
+      function verdict(total) {
+        if (total >= 9) return '会专程再来';
+        if (total >= 8) return '值得再来';
+        if (total >= 7) return '这顿挺满意';
+        if (total >= 6) return '可以一试';
+        if (total >= 4.5) return '值得再探索';
+        return '下次换一家';
+      }
+
+      function pointAt(index, radius) {
+        const angle = -Math.PI / 2 + index * Math.PI * 2 / dimensions.length;
+        return [125 + Math.cos(angle) * radius, 125 + Math.sin(angle) * radius];
+      }
+
+      function polygonPoints(radii) {
+        return radii.map((radius, i) => pointAt(i, radius).map(v => v.toFixed(1)).join(',')).join(' ');
+      }
+
+      function drawRadar(scores) {
+        const svg = $('#radar');
+        const grid = [1, .75, .5, .25].map(scale =>
+          `<polygon class="grid-line" points="${polygonPoints(dimensions.map(() => 78 * scale))}"/>`
+        ).join('');
+        const axes = dimensions.map((_, i) => {
+          const [x, y] = pointAt(i, 78);
+          return `<line class="axis-line" x1="125" y1="125" x2="${x}" y2="${y}"/>`;
+        }).join('');
+        const values = dimensions.map(d => 78 * Math.max(0, Math.min(10, scores[d.key])) / 10);
+        const areaPoints = polygonPoints(values);
+        const dots = values.map((radius, i) => {
+          const [x, y] = pointAt(i, radius);
+          return `<circle class="radar-dot" cx="${x}" cy="${y}" r="3.2"/>`;
+        }).join('');
+        const labels = dimensions.map((d, i) => {
+          const [x, y] = pointAt(i, 101);
+          return `<text class="radar-label" x="${x}" y="${y}">${d.label}</text>`;
+        }).join('');
+        svg.innerHTML = `${grid}${axes}<polygon class="radar-area" points="${areaPoints}"/>${dots}${labels}`;
+      }
+
+      function updateResult() {
+        const scores = currentScores();
+        dimensions.forEach(d => {
+          const input = $('#' + d.key);
+          $('#' + d.key + 'Output').textContent = Number(input.value).toFixed(1);
+          input.style.setProperty('--fill', ((Number(input.value) - 1) / 9 * 100) + '%');
+        });
+        const total = weightedTotal(scores);
+        $('#totalScore').textContent = total.toFixed(1);
+        $('#verdict').textContent = verdict(total);
+        drawRadar(scores);
+      }
+
+      function showToast(message) {
+        const toast = $('#toast');
+        toast.textContent = message;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+      }
+
+      function formatDate(timestamp) {
+        return new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
+      }
+
+      function renderHistory() {
+        $('#historyCount').textContent = `${records.length} 条记录`;
+        const history = $('#history');
+        if (!records.length) {
+          history.innerHTML = '<div class="empty">第一顿美味，还在等你记下。</div>';
+          $('#recordActions').hidden = true;
+          return;
+        }
+        history.innerHTML = records.map(record => `
+          <button class="record" type="button" data-id="${record.id}">
+            <span>
+              <span class="record-name">${escapeHTML(record.restaurant)}</span>
+              <span class="record-meta">${escapeHTML(record.cuisine)} · ${escapeHTML(record.reviewer)} · ${formatDate(record.createdAt)}</span>
+            </span>
+            <strong class="record-score">${Number(record.total).toFixed(1)}</strong>
+          </button>`).join('');
+        history.querySelectorAll('.record').forEach(button => button.addEventListener('click', () => loadRecord(button.dataset.id)));
+        $('#recordActions').hidden = !selectedId;
+      }
+
+      function loadRecord(id) {
+        const record = records.find(item => item.id === id);
+        if (!record) return;
+        selectedId = id;
+        $('#restaurant').value = record.restaurant;
+        $('#cuisine').value = record.cuisine;
+        $('#reviewer').value = record.reviewer;
+        dimensions.forEach(d => $('#' + d.key).value = record.scores[d.key]);
+        updateResult();
+        $('#recordActions').hidden = false;
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        showToast('已载入这条记录');
+      }
+
+      function resetForm() {
+        selectedId = null;
+        form.reset();
+        dimensions.forEach(d => $('#' + d.key).value = defaultScores[d.key]);
+        updateResult();
+        $('#recordActions').hidden = true;
+      }
+
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        if (!form.reportValidity()) return;
+        const scores = currentScores();
+        const item = {
+          id: selectedId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+          restaurant: $('#restaurant').value.trim(),
+          cuisine: $('#cuisine').value.trim(),
+          reviewer: $('#reviewer').value,
+          scores,
+          total: weightedTotal(scores),
+          createdAt: selectedId ? (records.find(r => r.id === selectedId)?.createdAt || Date.now()) : Date.now(),
+          updatedAt: Date.now()
+        };
+        if (selectedId) records = records.map(record => record.id === selectedId ? item : record);
+        else records.unshift(item);
+        writeRecords();
+        renderHistory();
+        showToast(selectedId ? '记录已更新' : '评分已保存');
+        resetForm();
+      });
+
+      $('#deleteButton').addEventListener('click', () => {
+        if (!selectedId) return;
+        if (!confirm('确定删除这条评分记录吗？')) return;
+        records = records.filter(record => record.id !== selectedId);
+        writeRecords();
+        resetForm();
+        renderHistory();
+        showToast('记录已删除');
+      });
+
+      $('#exportButton').addEventListener('click', () => {
+        if (!records.length) { showToast('还没有可导出的记录'); return; }
+        const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), records }, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `餐厅评分备份-${new Date().toISOString().slice(0, 10)}.json`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        showToast('备份已导出');
+      });
+
+      buildRatingRows();
+      updateResult();
+      renderHistory();
+    })();
+  </script>
+</body>
+</html>
