@@ -254,6 +254,73 @@
     }
     #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+    .image-modal {
+      position: fixed;
+      z-index: 20;
+      inset: 0;
+      display: grid;
+      align-items: end;
+      padding: 18px 14px max(18px, env(safe-area-inset-bottom));
+      background: rgba(20, 20, 18, .62);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .image-modal[hidden] { display: none; }
+    .image-sheet {
+      width: min(100%, 520px);
+      max-height: min(92dvh, 760px);
+      margin: 0 auto;
+      padding: 18px;
+      overflow: auto;
+      background: #fffdf8;
+      border-radius: 27px;
+      box-shadow: 0 25px 80px rgba(0,0,0,.28);
+    }
+    .image-sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .image-sheet-head p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .close-button {
+      flex: 0 0 38px;
+      width: 38px;
+      height: 38px;
+      color: var(--muted);
+      background: rgba(32,32,29,.06);
+      border: 0;
+      border-radius: 50%;
+      font-size: 23px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .card-preview {
+      display: block;
+      width: 100%;
+      height: auto;
+      margin: 16px 0;
+      background: var(--paper);
+      border-radius: 18px;
+      box-shadow: 0 10px 28px rgba(54,42,25,.14);
+      -webkit-touch-callout: default;
+    }
+    .image-actions { display: grid; grid-template-columns: 1fr auto; gap: 9px; }
+    .share-button {
+      min-height: 52px;
+      color: white;
+      background: var(--tomato);
+      border: 0;
+      border-radius: 15px;
+      font-weight: 750;
+      cursor: pointer;
+    }
+    .download-button {
+      min-height: 52px;
+      padding: 0 17px;
+      color: var(--ink);
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
     @media (min-width: 540px) {
       .shell { padding-left: 24px; padding-right: 24px; }
       .card { padding: 26px; }
@@ -326,7 +393,7 @@
         </div>
       </section>
 
-      <button class="primary" type="submit">保存这次评分</button>
+      <button class="primary" type="submit">保存并生成评分卡</button>
     </form>
 
     <section class="card" style="margin-top: 28px" aria-labelledby="historyTitle">
@@ -341,6 +408,23 @@
       <p class="storage-note">记录保存在当前浏览器中。清除 Safari 网站数据会删除记录，建议偶尔导出备份。</p>
     </section>
   </main>
+
+  <div id="imageModal" class="image-modal" role="dialog" aria-modal="true" aria-labelledby="imageModalTitle" hidden>
+    <div class="image-sheet">
+      <div class="image-sheet-head">
+        <div>
+          <h2 id="imageModalTitle">评分卡已生成</h2>
+          <p>iPhone 请点击“保存到相册”，再在系统菜单选择“存储图像”；也可以长按下方图片保存。</p>
+        </div>
+        <button id="closeImageModal" class="close-button" type="button" aria-label="关闭">×</button>
+      </div>
+      <img id="cardPreview" class="card-preview" alt="餐厅评分卡预览">
+      <div class="image-actions">
+        <button id="shareImageButton" class="share-button" type="button">保存到相册 / 分享</button>
+        <button id="downloadImageButton" class="download-button" type="button">下载</button>
+      </div>
+    </div>
+  </div>
 
   <div id="toast" role="status" aria-live="polite"></div>
 
@@ -363,6 +447,8 @@
       let records = readRecords();
       let selectedId = null;
       let toastTimer;
+      let generatedBlob = null;
+      let generatedFilename = '餐厅评分卡.png';
 
       function readRecords() {
         try {
@@ -464,6 +550,157 @@
         toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
       }
 
+      function roundRect(ctx, x, y, width, height, radius) {
+        const r = Math.min(radius, width / 2, height / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + width, y, x + width, y + height, r);
+        ctx.arcTo(x + width, y + height, x, y + height, r);
+        ctx.arcTo(x, y + height, x, y, r);
+        ctx.arcTo(x, y, x + width, y, r);
+        ctx.closePath();
+      }
+
+      function canvasPolygon(ctx, points) {
+        ctx.beginPath();
+        points.forEach(([x, y], index) => index ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+        ctx.closePath();
+      }
+
+      function cardPoint(centerX, centerY, index, radius) {
+        const angle = -Math.PI / 2 + index * Math.PI * 2 / dimensions.length;
+        return [centerX + Math.cos(angle) * radius, centerY + Math.sin(angle) * radius];
+      }
+
+      function cleanFilename(value) {
+        return String(value).replace(/[\\/:*?"<>|]/g, '-').slice(0, 30) || '餐厅';
+      }
+
+      async function generateShareCard(record) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1080;
+        canvas.height = 1440;
+        const ctx = canvas.getContext('2d');
+        const total = Number(record.total);
+
+        const background = ctx.createLinearGradient(0, 0, 1080, 1440);
+        background.addColorStop(0, '#fff7ed');
+        background.addColorStop(.55, '#f7f3eb');
+        background.addColorStop(1, '#e9efe6');
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, 1080, 1440);
+
+        ctx.fillStyle = 'rgba(233,91,63,.11)';
+        ctx.beginPath(); ctx.arc(990, 60, 260, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(103,125,100,.10)';
+        ctx.beginPath(); ctx.arc(40, 1130, 300, 0, Math.PI * 2); ctx.fill();
+
+        ctx.fillStyle = '#c63d28';
+        ctx.font = '700 27px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif';
+        ctx.letterSpacing = '5px';
+        ctx.fillText('RESTAURANT NOTES', 78, 92);
+        ctx.letterSpacing = '0px';
+
+        ctx.fillStyle = '#20201d';
+        ctx.font = '700 70px "Songti SC", "STSong", Georgia, serif';
+        ctx.fillText(record.restaurant, 76, 190, 920);
+        ctx.fillStyle = '#747268';
+        ctx.font = '500 28px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif';
+        ctx.fillText(`${record.cuisine}  ·  ${record.reviewer}`, 80, 244, 900);
+
+        roundRect(ctx, 58, 298, 964, 550, 54);
+        ctx.fillStyle = '#20201d';
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255,255,255,.58)';
+        ctx.font = '700 25px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif';
+        ctx.fillText('加权总分', 112, 408);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 164px Georgia, serif';
+        ctx.fillText(total.toFixed(1), 101, 590);
+        ctx.fillStyle = 'rgba(255,255,255,.48)';
+        ctx.font = '500 25px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif';
+        ctx.fillText('满分 10 分', 112, 646);
+        ctx.fillStyle = '#f5a089';
+        ctx.font = '700 28px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif';
+        ctx.fillText(verdict(total), 112, 716);
+
+        const cx = 755, cy = 563, radarRadius = 170;
+        [1, .75, .5, .25].forEach(scale => {
+          canvasPolygon(ctx, dimensions.map((_, i) => cardPoint(cx, cy, i, radarRadius * scale)));
+          ctx.strokeStyle = 'rgba(255,255,255,.17)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        });
+        dimensions.forEach((_, i) => {
+          const [x, y] = cardPoint(cx, cy, i, radarRadius);
+          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, y);
+          ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.stroke();
+        });
+        const scorePoints = dimensions.map((d, i) => cardPoint(cx, cy, i, radarRadius * record.scores[d.key] / 10));
+        canvasPolygon(ctx, scorePoints);
+        ctx.fillStyle = 'rgba(233,91,63,.38)'; ctx.fill();
+        ctx.strokeStyle = '#ff8a6c'; ctx.lineWidth = 5; ctx.stroke();
+        scorePoints.forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fillStyle = '#ffb09a'; ctx.fill(); });
+        ctx.fillStyle = 'rgba(255,255,255,.76)';
+        ctx.font = '650 22px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        dimensions.forEach((d, i) => {
+          const [x, y] = cardPoint(cx, cy, i, radarRadius + 47);
+          ctx.fillText(d.label, x, y);
+        });
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+
+        ctx.fillStyle = '#20201d';
+        ctx.font = '700 36px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif';
+        ctx.fillText('五维评分', 76, 944);
+
+        dimensions.forEach((d, index) => {
+          const y = 1026 + index * 68;
+          ctx.fillStyle = '#20201d';
+          ctx.font = '650 27px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif';
+          ctx.fillText(d.label, 80, y);
+          ctx.fillStyle = 'rgba(32,32,29,.10)';
+          roundRect(ctx, 248, y - 22, 626, 15, 8); ctx.fill();
+          ctx.fillStyle = '#e95b3f';
+          roundRect(ctx, 248, y - 22, 626 * record.scores[d.key] / 10, 15, 8); ctx.fill();
+          ctx.fillStyle = '#20201d';
+          ctx.font = '700 27px Georgia, serif';
+          ctx.textAlign = 'right';
+          ctx.fillText(Number(record.scores[d.key]).toFixed(1), 982, y);
+          ctx.textAlign = 'left';
+        });
+
+        ctx.fillStyle = '#747268';
+        ctx.font = '500 22px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif';
+        const dateText = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(record.updatedAt || record.createdAt));
+        ctx.fillText(`记录于 ${dateText}`, 78, 1380);
+        ctx.textAlign = 'right';
+        ctx.fillText('吃得如何？', 1000, 1380);
+        ctx.textAlign = 'left';
+
+        const dataUrl = canvas.toDataURL('image/png');
+        $('#cardPreview').src = dataUrl;
+        generatedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1));
+        generatedFilename = `${cleanFilename(record.restaurant)}-${record.reviewer}-评分卡.png`;
+        $('#imageModal').hidden = false;
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeImageModal() {
+        $('#imageModal').hidden = true;
+        document.body.style.overflow = '';
+      }
+
+      function downloadGeneratedImage() {
+        if (!generatedBlob) return;
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(generatedBlob);
+        link.download = generatedFilename;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      }
+
       function formatDate(timestamp) {
         return new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
       }
@@ -510,7 +747,7 @@
         $('#recordActions').hidden = true;
       }
 
-      form.addEventListener('submit', event => {
+      form.addEventListener('submit', async event => {
         event.preventDefault();
         if (!form.reportValidity()) return;
         const scores = currentScores();
@@ -530,6 +767,25 @@
         renderHistory();
         showToast(selectedId ? '记录已更新' : '评分已保存');
         resetForm();
+        await generateShareCard(item);
+      });
+
+      $('#closeImageModal').addEventListener('click', closeImageModal);
+      $('#imageModal').addEventListener('click', event => { if (event.target === $('#imageModal')) closeImageModal(); });
+      $('#downloadImageButton').addEventListener('click', downloadGeneratedImage);
+      $('#shareImageButton').addEventListener('click', async () => {
+        if (!generatedBlob) return;
+        const file = new File([generatedBlob], generatedFilename, { type: 'image/png' });
+        if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+          try {
+            await navigator.share({ title: '餐厅评分卡', files: [file] });
+          } catch (error) {
+            if (error.name !== 'AbortError') downloadGeneratedImage();
+          }
+        } else {
+          downloadGeneratedImage();
+          showToast('图片已下载，可长按预览保存到相册');
+        }
       });
 
       $('#deleteButton').addEventListener('click', () => {
